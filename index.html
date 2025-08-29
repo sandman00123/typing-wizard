@@ -5,38 +5,37 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Typing Wizard – Mobile Wrapper</title>
   <style>
-    html,body {margin:0;height:100%;background:#0e0f19;}
-    #game {position:fixed; inset:0; border:0; width:100%; height:100%;}
-    /* hidden input to trigger mobile keyboard */
-    #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
-    /* overlay button to capture the real user tap */
-    #mobileStartOverlay {
-      position:fixed; inset:0; z-index:9999;
-      background:transparent; border:none;
-      display:none;
+    html,body {margin:0;height:100%;background:#0e0f19;display:flex;flex-direction:column;}
+    #topbar {background:#16182a;padding:10px;display:flex;gap:10px;justify-content:center;}
+    #topbar button {
+      background:#7ea1ff; border:none; border-radius:8px;
+      padding:8px 12px; font-weight:700; cursor:pointer;
     }
+    #game {flex:1; border:0; width:100%;}
+    #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
   </style>
 </head>
 <body>
-  <iframe id="game" src="game.html" allow="gamepad *"></iframe>
+  <div id="topbar">
+    <button id="mobileStartBtn">Start for Mobile</button>
+  </div>
+  <iframe id="game" src="game.html"></iframe>
   <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
-  <button id="mobileStartOverlay"></button>
 
   <script>
     const frame = document.getElementById('game');
     const kb = document.getElementById('kb');
-    const bridgeBtn = document.getElementById('mobileStartOverlay');
+    const mobileStartBtn = document.getElementById('mobileStartBtn');
 
     function focusKeyboard() {
       kb.value = '';
-      kb.focus({ preventScroll: true });
-      // re-focus shortly after to keep keyboard up
+      kb.focus({ preventScroll:true });
       setTimeout(() => {
-        if (document.activeElement !== kb) kb.focus({ preventScroll: true });
+        if (document.activeElement !== kb) kb.focus({ preventScroll:true });
       }, 50);
     }
 
-    // Forward typed chars/backspace to the game
+    // Forward keys from hidden input to game
     kb.addEventListener('input', () => {
       const val = kb.value;
       if (!val) return;
@@ -48,30 +47,20 @@
 
     kb.addEventListener('keydown', (e) => {
       if (e.key === 'Backspace') {
-        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Backspace', bubbles:true }));
         e.preventDefault();
       }
     });
 
+    // Mobile Start button
+    mobileStartBtn.addEventListener('click', () => {
+      focusKeyboard();
+      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*');
+    });
+
     // Keep focus so keyboard stays open
     window.addEventListener('touchend', () => {
-      if (document.activeElement !== kb) kb.focus({ preventScroll: true });
-    });
-
-    // Listen for requests from game
-    window.addEventListener('message', (e) => {
-      if (!e || !e.data) return;
-      if (e.data.type === 'TW_REQUEST_MOBILE_START') {
-        // Show invisible overlay button to capture next tap
-        bridgeBtn.style.display = 'block';
-      }
-    });
-
-    // When overlay tapped: focus keyboard + start game
-    bridgeBtn.addEventListener('click', () => {
-      focusKeyboard();
-      frame.contentWindow.postMessage({ type: 'TW_START_GAME' }, '*');
-      bridgeBtn.style.display = 'none';
+      if (document.activeElement !== kb) kb.focus({ preventScroll:true });
     });
   </script>
 </body>
