@@ -6,12 +6,13 @@
   <title>Typing Wizard – Mobile Wrapper</title>
   <style>
     html,body {margin:0;height:100%;background:#0e0f19;display:flex;flex-direction:column;}
-    #topbar {background:#16182a;padding:10px;display:flex;gap:10px;justify-content:center;}
+    #topbar {background:#16182a;padding:10px;display:flex;gap:10px;justify-content:center;border-bottom:1px solid #22253e;}
     #topbar button {
       background:#7ea1ff; border:none; border-radius:8px;
-      padding:8px 12px; font-weight:700; cursor:pointer;
+      padding:8px 12px; font-weight:700; cursor:pointer; color:#0b0d18;
     }
     #game {flex:1; border:0; width:100%;}
+    /* hidden input to trigger mobile keyboard */
     #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
   </style>
 </head>
@@ -19,7 +20,8 @@
   <div id="topbar">
     <button id="mobileStartBtn">Start for Mobile</button>
   </div>
-  <iframe id="game" src="game.html"></iframe>
+
+  <iframe id="game" src="game.html" allow="gamepad *"></iframe>
   <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
 
   <script>
@@ -30,12 +32,13 @@
     function focusKeyboard() {
       kb.value = '';
       kb.focus({ preventScroll:true });
+      // re-focus shortly after to keep keyboard open if something steals focus
       setTimeout(() => {
         if (document.activeElement !== kb) kb.focus({ preventScroll:true });
       }, 50);
     }
 
-    // Forward keys from hidden input to game
+    // Forward typed chars/backspace to the game window (game listens on window keydown)
     kb.addEventListener('input', () => {
       const val = kb.value;
       if (!val) return;
@@ -52,15 +55,15 @@
       }
     });
 
-    // Mobile Start button
-    mobileStartBtn.addEventListener('click', () => {
-      focusKeyboard();
-      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*');
-    });
-
-    // Keep focus so keyboard stays open
+    // Keep focus so keyboard stays up while tapping around
     window.addEventListener('touchend', () => {
       if (document.activeElement !== kb) kb.focus({ preventScroll:true });
+    });
+
+    // Mobile Start: open keyboard and tell game to start
+    mobileStartBtn.addEventListener('click', () => {
+      focusKeyboard();                       // user gesture here → keyboard allowed
+      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*'); // start game
     });
   </script>
 </body>
