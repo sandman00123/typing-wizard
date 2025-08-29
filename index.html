@@ -12,7 +12,6 @@
       padding:8px 12px; font-weight:700; cursor:pointer; color:#0b0d18;
     }
     #game {flex:1; border:0; width:100%;}
-    /* hidden input to trigger mobile keyboard */
     #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
   </style>
 </head>
@@ -20,7 +19,6 @@
   <div id="topbar">
     <button id="mobileStartBtn">Start for Mobile</button>
   </div>
-
   <iframe id="game" src="game.html" allow="gamepad *"></iframe>
   <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
 
@@ -32,13 +30,13 @@
     function focusKeyboard() {
       kb.value = '';
       kb.focus({ preventScroll:true });
-      // re-focus shortly after to keep keyboard open if something steals focus
+      // small keep-alive refocus to resist focus steals
       setTimeout(() => {
         if (document.activeElement !== kb) kb.focus({ preventScroll:true });
       }, 50);
     }
 
-    // Forward typed chars/backspace to the game window (game listens on window keydown)
+    // Forward keys from hidden input to the game (which listens on window keydown)
     kb.addEventListener('input', () => {
       const val = kb.value;
       if (!val) return;
@@ -55,15 +53,15 @@
       }
     });
 
-    // Keep focus so keyboard stays up while tapping around
+    // Keep keyboard open during taps
     window.addEventListener('touchend', () => {
       if (document.activeElement !== kb) kb.focus({ preventScroll:true });
     });
 
-    // Mobile Start: open keyboard and tell game to start
+    // Mobile Start button: open keyboard + start the game in iframe
     mobileStartBtn.addEventListener('click', () => {
-      focusKeyboard();                       // user gesture here → keyboard allowed
-      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*'); // start game
+      focusKeyboard();
+      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*');
     });
   </script>
 </body>
