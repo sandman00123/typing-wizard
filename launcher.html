@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Typing Wizard – Launcher</title>
+  <style>
+    html,body { margin:0; height:100%; background:#0e0f19; }
+    /* The game fills the page */
+    #gameframe { position:fixed; inset:0; width:100%; height:100%; border:0; }
+
+    /* Keyboard button (top-right) – hidden by default, shown on touch */
+    #kbBtn {
+      position:fixed; top:10px; right:10px; z-index:9999;
+      display:none;
+      background:#7ea1ff; color:#0b0d18; font-weight:700;
+      border:none; border-radius:10px; padding:8px 12px; cursor:pointer;
+      box-shadow:0 6px 18px rgba(0,0,0,.25);
+    }
+    #kbBtn:active { transform:translateY(1px); }
+
+    /* Hidden input used to trigger the mobile soft keyboard */
+    #kbInput {
+      position:fixed; left:-10000px; top:-10000px; opacity:0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Your original game stays UNCHANGED and loads inside this iframe -->
+  <iframe id="gameframe" src="index.html" allow="gamepad *"></iframe>
+
+  <!-- Only shown on touch devices -->
+  <button id="kbBtn" aria-label="Open keyboard">Keyboard</button>
+  <input id="kbInput" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" />
+
+  <script>
+    // --- Detect touch device ---
+    const isTouch = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0)
+                  || window.matchMedia('(pointer: coarse)').matches
+                  || 'ontouchstart' in window);
+
+    const frame = document.getElementById('gameframe');
+    const kbBtn = document.getElementById('kbBtn');
+    const kb = document.getElementById('kbInput');
+
+    if (isTouch) kbBtn.style.display = 'inline-block'; // show button only on touch
+
+    // --- Focus hidden input to open the soft keyboard (must be from a user gesture) ---
+    function focusKeyboard() {
+      kb.value = '';
+      kb.focus({ preventScroll: true });
+      // Small refocus helps some Android/iOS builds keep the keyboard open
+      setTimeout(() => { if (document.activeElement !== kb) kb.focus({ preventScroll:true }); }, 50);
+    }
+
+    kbBtn.addEventListener('click', () => {
+      focusKeyboard();
+      // Optional: if your game shows a start overlay, you can auto-send "Enter" here.
+      // frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true }));
+    });
+
+    // --- Forward characters from hidden input to the game window ---
+    kb.addEventListener('input', () => {
+      const val = kb.value;
+      if (!val) return;
+      const ch = val.slice(-1);
+      kb.value = '';
+      if (!/^[a-zA-Z]$/.test(ch)) return; // your game expects letters
+      frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+    });
+
+    // Backspace support
+    kb.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') {
+        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Backspace', bubbles:true }));
+        e.preventDefault();
+      }
+    });
+
+    // Keep keyboard alive while tapping around
+    window.addEventListener('touchend', () => {
+      if (document.activeElement !== kb) kb.focus({ preventScroll:true });
+    });
+  </script>
+</body>
+</html>
