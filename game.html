@@ -88,8 +88,8 @@
         <div class="btnrow">
           <button id="startBtn">Play</button>
           <button class="secondary" id="howBtn">How to play</button>
-          <!-- NEW: Keyboard button -->
-          <button class="secondary" id="kbBtn">Keyboard</button>
+          <!-- NEW: Start for Mobile -->
+          <button class="secondary" id="mobileBtn">Start for Mobile</button>
         </div>
       </div>
     </div>
@@ -174,7 +174,7 @@
   const ovSubtitle = document.getElementById('ovSubtitle');
   const startBtn = document.getElementById('startBtn');
   const howBtn = document.getElementById('howBtn');
-  const kbBtn = document.getElementById('kbBtn');
+  const mobileBtn = document.getElementById('mobileBtn');
   const typedBox = document.getElementById('typedText');
   const btnPause = document.getElementById('btnPause');
   const btnRestart = document.getElementById('btnRestart');
@@ -458,18 +458,19 @@
       • Tier increases based on <b>score</b>:
       700 → Tier 2, 1700 → Tier 3, 3200 → Tier 4, 5200 → Tier 5.<br/>
       • Longer words = more points. Missed words cost a life.<br/>
-      • Use the <b>Keyboard</b> button on mobile to open the soft keyboard.
+      • Use <b>Start for Mobile</b> to open the soft keyboard and start immediately.
     `;
   });
 
-  // NEW: Keyboard button sends a message to the wrapper to focus the hidden input
-  kbBtn.addEventListener('click', () => {
+  // NEW: Start for Mobile → ask wrapper to focus keyboard, then start game
+  mobileBtn.addEventListener('click', () => {
     if (window.parent) {
       window.parent.postMessage({ type: 'TW_FOCUS_KB' }, '*');
     }
+    startGame(); // immediately begin
   });
 
-  // Pause shows overlay (with Keyboard button available)
+  // Pause shows overlay (buttons available)
   btnPause.addEventListener('click', () => {
     if (!running) {
       showOverlayHome();
@@ -478,7 +479,7 @@
     pauseToggle();
   });
 
-  // Restart now resets and shows the overlay again so all buttons (incl. Keyboard) are visible
+  // Restart resets and shows the overlay again so all buttons (incl. Start for Mobile) are visible
   btnRestart.addEventListener('click', () => {
     resetGame();
     running = false;
