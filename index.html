@@ -19,13 +19,17 @@
     const frame = document.getElementById('game');
     const kb = document.getElementById('kb');
 
-    // Focus the hidden input to open soft keyboard (must follow a user gesture)
     function focusKeyboard() {
+      // Focus immediately (within the user gesture handler)
       kb.value = '';
       kb.focus({ preventScroll: true });
+      // Light keep-alive: if something stole focus, refocus shortly after
+      setTimeout(() => {
+        if (document.activeElement !== kb) kb.focus({ preventScroll: true });
+      }, 50);
     }
 
-    // Forward typed chars/backspace to the game (which listens to window keydown)
+    // Forward typed chars/backspace to the game (game listens on window keydown)
     kb.addEventListener('input', () => {
       const val = kb.value;
       if (!val) return;
@@ -34,6 +38,7 @@
       if (!/^[a-zA-Z]$/.test(ch)) return;
       frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
     });
+
     kb.addEventListener('keydown', (e) => {
       if (e.key === 'Backspace') {
         frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
@@ -41,7 +46,7 @@
       }
     });
 
-    // Keep focus so keyboard stays open while the player taps
+    // Keep focus so keyboard stays open while tapping
     window.addEventListener('touchend', () => {
       if (document.activeElement !== kb) kb.focus({ preventScroll: true });
     });
@@ -50,7 +55,7 @@
     window.addEventListener('message', (e) => {
       if (!e || !e.data) return;
       if (e.data.type === 'TW_FOCUS_KB') {
-        // This should be triggered by a user tap on the "Keyboard" button inside the game
+        // Trigger keyboard focus (user just tapped Start for Mobile)
         focusKeyboard();
       }
     });
