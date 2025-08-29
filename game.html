@@ -1,142 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Typing Wizard</title>
+  <title>Typing Wizard – Mobile Wrapper</title>
   <style>
-    :root {
-      --bg:#0e0f19; --panel:#16182a; --text:#f2f4ff; --accent:#7ea1ff; --good:#5cf29b; --bad:#ff6b6b; --muted:#8b90a3;
+    html,body {margin:0;height:100%;background:#0e0f19;display:flex;flex-direction:column;}
+    #topbar {background:#16182a;padding:10px;display:flex;gap:10px;justify-content:center;border-bottom:1px solid #22253e;}
+    #topbar button {
+      background:#7ea1ff; border:none; border-radius:8px;
+      padding:8px 12px; font-weight:700; cursor:pointer; color:#0b0d18;
     }
-    * { box-sizing: border-box; }
-    html, body { margin:0; height:100%; background:linear-gradient(180deg, #0e0f19 0%, #0a0b12 100%); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji"; }
-    #wrap { display:flex; flex-direction:column; height:100vh; }
-    header { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid #22253e; }
-    header h1 { font-size:16px; margin:0; letter-spacing:0.5px; color:var(--accent); }
-    header .stats { display:flex; gap:16px; font-weight:600; flex-wrap:wrap; }
-    header .stats span { color:var(--muted); }
-    header .stats b { color:var(--text); }
-    header .left { display:flex; align-items:center; gap:10px; }
-    .ctrls { display:flex; gap:8px; }
-    button.small {
-      background:var(--panel);
-      color:var(--text);
-      border:1px solid #3a3e6b;
-      padding:6px 10px;
-      border-radius:8px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    button.small:hover { filter:brightness(1.1); }
-    #game { flex:1; position:relative; }
-    canvas { width:100%; height:100%; display:block; }
-    #hint { position:absolute; left:12px; bottom:12px; color:var(--muted); font-size:12px; opacity:0.8; }
-    #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(10,11,18,0.7); backdrop-filter: blur(2px); }
-    #overlay.show { display:flex; }
-    .card {
-      background:var(--panel); border:1px solid #22253e; border-radius:14px; padding:20px 18px; max-width:560px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    }
-    .card h2 { margin:4px 0 10px; font-size:22px; }
-    .card p { margin:6px 0; color:var(--muted); }
-    .btnrow { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
-    button { background:var(--accent); color:#0b0d18; border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; }
-    button.secondary { background:transparent; color:var(--text); border:1px solid #3a3e6b; }
-    #typed {
-      position:absolute; top:8px; left:50%; transform:translateX(-50%);
-      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background:rgba(126,161,255,0.08); border:1px solid rgba(126,161,255,0.35);
-      padding:6px 10px; border-radius:10px; font-size:14px; letter-spacing:0.5px;
-    }
-    #toast {
-      position:absolute; top:16px; right:16px; padding:8px 12px; border-radius:10px;
-      background:rgba(92,242,155,0.12); border:1px solid rgba(92,242,155,0.4); color:#5cf29b;
-      font-weight:700; display:none;
-    }
-    #toast.show { display:block; animation: fade 1.8s ease-out forwards; }
-    @keyframes fade { 0%{opacity:1; transform:translateY(0)} 90%{opacity:1} 100%{opacity:0; transform:translateY(-8px)} }
+    #game {flex:1; border:0; width:100%;}
+    #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
   </style>
 </head>
 <body>
-<div id="wrap">
-  <header>
-    <div class="left">
-      <div class="ctrls">
-        <button id="btnPause" class="small">Pause</button>
-        <button id="btnRestart" class="small">Restart</button>
-      </div>
-      <h1>🧙‍♂️ Typing Wizard</h1>
-    </div>
-    <div class="stats">
-      <span>Score: <b id="score">0</b></span>
-      <span>Lives: <b id="lives">3</b></span>
-      <span>Tier: <b id="tier">1</b></span>
-      <span>Wave: <b id="wave">1</b></span>
-      <span>WPM: <b id="wpm">0</b></span>
-    </div>
-  </header>
-  <div id="game">
-    <canvas id="c"></canvas>
-    <div id="typed">Type: <b id="typedText"></b><span id="caret">▌</span></div>
-    <div id="hint">Click Pause/Restart (top-left). Type letters to play. Backspace clears.</div>
-    <div id="toast"></div>
-
-    <div id="overlay" class="show">
-      <div class="card">
-        <h2 id="ovTitle">Typing Wizard</h2>
-        <p id="ovSubtitle">Defeat drifting words by typing them exactly. Don’t let them reach the bottom!</p>
-        <div class="btnrow">
-          <button id="startBtn">Play</button>
-          <button class="secondary" id="howBtn">How to play</button>
-          <button class="secondary" id="mobileBtn">Start for Mobile</button>
-        </div>
-      </div>
-    </div>
+  <div id="topbar">
+    <button id="mobileStartBtn">Start for Mobile</button>
   </div>
-</div>
+  <iframe id="game" src="game.html" allow="gamepad *"></iframe>
+  <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
 
-<script>
-(() => {
-  // … (dictionary and game code stays the same) …
+  <script>
+    const frame = document.getElementById('game');
+    const kb = document.getElementById('kb');
+    const mobileStartBtn = document.getElementById('mobileStartBtn');
 
-  const startBtn = document.getElementById('startBtn');
-  const howBtn = document.getElementById('howBtn');
-  const mobileBtn = document.getElementById('mobileBtn');
-  const btnPause = document.getElementById('btnPause');
-  const btnRestart = document.getElementById('btnRestart');
-
-  // Start button (desktop/normal)
-  startBtn.addEventListener('click', () => {
-    startGame();
-  });
-
-  // How to play
-  howBtn.addEventListener('click', () => {
-    ovTitle.textContent = 'How to play';
-    ovSubtitle.innerHTML = `
-      • Words drift down.<br/>
-      • <b>Type</b> a word exactly to destroy it.<br/>
-      • Tier increases based on <b>score</b>.<br/>
-      • Use <b>Start for Mobile</b> on touch devices to pop keyboard and start.
-    `;
-  });
-
-  // Start for Mobile → ask wrapper to focus keyboard
-  mobileBtn.addEventListener('click', () => {
-    if (window.parent) {
-      window.parent.postMessage({ type: 'TW_REQUEST_MOBILE_START' }, '*');
+    function focusKeyboard() {
+      kb.value = '';
+      kb.focus({ preventScroll:true });
+      // small keep-alive refocus to resist focus steals
+      setTimeout(() => {
+        if (document.activeElement !== kb) kb.focus({ preventScroll:true });
+      }, 50);
     }
-  });
 
-  // Listen for wrapper telling game to start
-  window.addEventListener('message', (e) => {
-    if (!e || !e.data) return;
-    if (e.data.type === 'TW_START_GAME') {
-      startGame();
-    }
-  });
+    // Forward keys from hidden input to the game (which listens on window keydown)
+    kb.addEventListener('input', () => {
+      const val = kb.value;
+      if (!val) return;
+      const ch = val.slice(-1);
+      kb.value = '';
+      if (!/^[a-zA-Z]$/.test(ch)) return;
+      frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+    });
 
-  // Pause + Restart handlers unchanged
-})();
-</script>
+    kb.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') {
+        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Backspace', bubbles:true }));
+        e.preventDefault();
+      }
+    });
+
+    // Keep keyboard open during taps
+    window.addEventListener('touchend', () => {
+      if (document.activeElement !== kb) kb.focus({ preventScroll:true });
+    });
+
+    // Mobile Start button: open keyboard + start the game in iframe
+    mobileStartBtn.addEventListener('click', () => {
+      focusKeyboard();
+      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*');
+    });
+  </script>
 </body>
 </html>
