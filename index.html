@@ -3,58 +3,57 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Typing Wizard – Mobile</title>
+  <title>Typing Wizard – Mobile Wrapper</title>
   <style>
     html,body {margin:0;height:100%;background:#0e0f19;}
     #game {position:fixed; inset:0; border:0; width:100%; height:100%;}
-    #overlay {position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.5); color:#fff; font:600 18px system-ui; cursor:pointer;}
-    /* off-screen input to trigger keyboard */
+    /* hidden input to trigger mobile keyboard */
     #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
   </style>
 </head>
 <body>
   <iframe id="game" src="game.html" allow="gamepad *"></iframe>
   <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
-  <div id="overlay">Tap to start typing</div>
 
   <script>
     const frame = document.getElementById('game');
     const kb = document.getElementById('kb');
-    const overlay = document.getElementById('overlay');
 
-    // 1) user taps → focus hidden input → keyboard opens
-    overlay.addEventListener('click', () => {
-      overlay.style.display = 'none';
+    // Focus the hidden input to open soft keyboard (must follow a user gesture)
+    function focusKeyboard() {
       kb.value = '';
-      kb.focus({ preventScroll:true });
-    });
+      kb.focus({ preventScroll: true });
+    }
 
-    // 2) forward characters to the game iframe as keydown events
+    // Forward typed chars/backspace to the game (which listens to window keydown)
     kb.addEventListener('input', () => {
       const val = kb.value;
       if (!val) return;
       const ch = val.slice(-1);
-      kb.value = ''; // clear so next char arrives cleanly
-      // only a–z for this game
+      kb.value = '';
       if (!/^[a-zA-Z]$/.test(ch)) return;
-      const evt = new KeyboardEvent('keydown', { key: ch, bubbles: true });
-      frame.contentWindow.dispatchEvent(evt);
+      frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
     });
-
-    // Backspace support
     kb.addEventListener('keydown', (e) => {
       if (e.key === 'Backspace') {
-        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Backspace', bubbles:true }));
+        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
         e.preventDefault();
       }
     });
 
-    // Keep focus so keyboard stays open
+    // Keep focus so keyboard stays open while the player taps
     window.addEventListener('touchend', () => {
-      if (document.activeElement !== kb) kb.focus({ preventScroll:true });
+      if (document.activeElement !== kb) kb.focus({ preventScroll: true });
+    });
+
+    // Listen for messages from the game to (re)open the keyboard
+    window.addEventListener('message', (e) => {
+      if (!e || !e.data) return;
+      if (e.data.type === 'TW_FOCUS_KB') {
+        // This should be triggered by a user tap on the "Keyboard" button inside the game
+        focusKeyboard();
+      }
     });
   </script>
 </body>
 </html>
-
