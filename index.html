@@ -1,68 +1,480 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Typing Wizard – Mobile Wrapper</title>
+  <title>Typing Wizard</title>
   <style>
-    html,body {margin:0;height:100%;background:#0e0f19;display:flex;flex-direction:column;}
-    #topbar {background:#16182a;padding:10px;display:flex;gap:10px;justify-content:center;border-bottom:1px solid #22253e;}
-    #topbar button {
-      background:#7ea1ff; border:none; border-radius:8px;
-      padding:8px 12px; font-weight:700; cursor:pointer; color:#0b0d18;
+    :root {
+      --bg:#0e0f19; --panel:#16182a; --text:#f2f4ff; --accent:#7ea1ff; --good:#5cf29b; --bad:#ff6b6b; --muted:#8b90a3;
     }
-    #game {flex:1; border:0; width:100%;}
-    #kb { position:fixed; left:-10000px; top:-10000px; opacity:0; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:linear-gradient(180deg, #0e0f19 0%, #0a0b12 100%); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji"; }
+    #wrap { display:flex; flex-direction:column; height:100vh; }
+    header { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid #22253e; }
+    header h1 { font-size:16px; margin:0; letter-spacing:0.5px; color:var(--accent); }
+    header .stats { display:flex; gap:16px; font-weight:600; flex-wrap:wrap; }
+    header .stats span { color:var(--muted); }
+    header .stats b { color:var(--text); }
+    header .left { display:flex; align-items:center; gap:10px; }
+    .ctrls { display:flex; gap:8px; }
+    button.small {
+      background:var(--panel);
+      color:var(--text);
+      border:1px solid #3a3e6b;
+      padding:6px 10px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    button.small:hover { filter:brightness(1.1); }
+    #game { flex:1; position:relative; }
+    canvas { width:100%; height:100%; display:block; }
+    #hint { position:absolute; left:12px; bottom:12px; color:var(--muted); font-size:12px; opacity:0.8; }
+    #overlay {
+      position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(10,11,18,0.7); backdrop-filter: blur(2px);
+    }
+    #overlay.show { display:flex; }
+    .card {
+      background:var(--panel); border:1px solid #22253e; border-radius:14px; padding:20px 18px; max-width:560px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .card h2 { margin:4px 0 10px; font-size:22px; }
+    .card p { margin:6px 0; color:var(--muted); }
+    .btnrow { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+    button {
+      background:var(--accent); color:#0b0d18; border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer;
+    }
+    button.secondary { background:transparent; color:var(--text); border:1px solid #3a3e6b; }
+    #typed {
+      position:absolute; top:8px; left:50%; transform:translateX(-50%);
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background:rgba(126,161,255,0.08); border:1px solid rgba(126,161,255,0.35);
+      padding:6px 10px; border-radius:10px; font-size:14px; letter-spacing:0.5px;
+    }
+    /* Tier up toast */
+    #toast {
+      position:absolute; top:16px; right:16px; padding:8px 12px; border-radius:10px;
+      background:rgba(92,242,155,0.12); border:1px solid rgba(92,242,155,0.4); color:#5cf29b;
+      font-weight:700; display:none;
+    }
+    #toast.show { display:block; animation: fade 1.8s ease-out forwards; }
+    @keyframes fade { 0%{opacity:1; transform:translateY(0)} 90%{opacity:1} 100%{opacity:0; transform:translateY(-8px)} }
   </style>
 </head>
 <body>
-  <div id="topbar">
-    <button id="mobileStartBtn">Start for Mobile</button>
+<div id="wrap">
+  <header>
+    <div class="left">
+      <div class="ctrls">
+        <button id="btnPause" class="small">Pause</button>
+        <button id="btnRestart" class="small">Restart</button>
+      </div>
+      <h1>🧙‍♂️ Typing Wizard</h1>
+    </div>
+    <div class="stats">
+      <span>Score: <b id="score">0</b></span>
+      <span>Lives: <b id="lives">3</b></span>
+      <span>Tier: <b id="tier">1</b></span>
+      <span>Wave: <b id="wave">1</b></span>
+      <span>WPM: <b id="wpm">0</b></span>
+    </div>
+  </header>
+  <div id="game">
+    <canvas id="c"></canvas>
+    <div id="typed">Type: <b id="typedText"></b><span id="caret">▌</span></div>
+    <div id="hint">Click Pause/Restart (top-left). Type letters to play. Backspace clears.</div>
+    <div id="toast"></div>
+
+    <div id="overlay" class="show">
+      <div class="card">
+        <h2 id="ovTitle">Typing Wizard</h2>
+        <p id="ovSubtitle">Defeat drifting words by typing them exactly. Don’t let them reach the bottom!</p>
+        <div class="btnrow">
+          <button id="startBtn">Start</button>
+          <button class="secondary" id="howBtn">How to play</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <iframe id="game" src="game.html" allow="gamepad *"></iframe>
-  <input id="kb" type="text" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false">
+</div>
 
-  <script>
-    const frame = document.getElementById('game');
-    const kb = document.getElementById('kb');
-    const mobileStartBtn = document.getElementById('mobileStartBtn');
+<script>
+(() => {
+  // =======================
+  // DICTIONARY (500 words)
+  // =======================
+  const DICT = {
+    1: [ // 3 letters (60)
+      "cat","dog","sun","map","car","bat","top","hat","pen","cup",
+      "egg","box","man","run","fun","win","jam","bed","fan","lip",
+      "zip","fox","cow","owl","ant","bee","rat","pig","hen","ear",
+      "arm","leg","toe","ice","oil","sea","sky","red","tan","hot",
+      "dry","wet","low","big","old","new","joy","toy","rod","key",
+      "bus","van","cap","net","pot","pan","bow","axe","rug","bar"
+    ],
+    2: [ // 4 letters (80)
+      "book","fish","game","milk","ball","tree","door","lamp","bird","song",
+      "rain","wind","snow","star","fire","cake","frog","lion","wolf","bear",
+      "duck","goat","crab","deer","ship","moon","rock","sand","wave","hill",
+      "lake","farm","road","path","film","play","goal","team","race","jump",
+      "swim","ride","walk","cook","bake","note","song","sing","band","drum",
+      "gold","iron","wood","coal","clay","salt","rice","meat","corn","pear",
+      "plum","kiwi","lime","rose","lily","leaf","root","seed","crop","tent",
+      "camp","home","city","town","king","queen","army","sold","tale","myth"
+    ],
+    3: [ // 5 letters (100)
+      "apple","grape","mango","peach","melon","lemon","chili","bread","cheese","drink",
+      "water","juice","candy","sugar","honey","flour","pasta","sauce","spice","meals",
+      "table","chair","couch","spoon","plate","knife","glass","clock","watch","phone",
+      "paper","penny","money","coins","shops","store","trade","build","house","tower",
+      "cabin","camps","hotel","beach","coast","river","ocean","isles","valve","stone",
+      "earth","metal","steel","grass","woods","field","plant","fruit","grill","flame",
+      "light","sound","voice","music","notes","chord","scale","piano","guitar","flute",
+      "drums","viola","dance","actor","scene","story","novel","poems","plays","verse",
+      "brain","heart","blood","hands","mouth","teeth","smile","laugh","sight","touch",
+      "dream","think","smart","quick","happy","angry","proud","brave","magic","peace"
+    ],
+    4: [ // 6 letters (120)
+      "planet","silver","golden","copper","forest","jungle","desert","island","castle","palace",
+      "bridge","tunnel","market","square","church","temple","statue","museum","school","college",
+      "garden","flower","butter","animal","insect","spider","monkey","rabbit","donkey","parrot",
+      "singer","actor","artist","author","poetry","guitar","piano","driven","driver","flight",
+      "rocket","saturn","jovian","meteor","comets","galaxy","cosmos","energy","matter","atomic",
+      "signal","system","engine","cables","remote","screen","camera","mouse","board","button",
+      "helmet","jacket","fabric","cotton","leather","rubber","bottle","basket","ladder","mirror",
+      "vision","motion","beauty","wonder","people","family","friend","mother","father","sister",
+      "brother","uncle","aunts","childs","babies","elders","leader","ruler","knight","bishop",
+      "doctor","nurse","judge","pilot","sailor","farmer","worker","miner","soldier","hunter",
+      "police","prison","lawyer","mayors","senate","empire","nation","border","weapon","shield"
+    ],
+    5: [ // 7 letters (140)
+      "village","station","harbour","airport","stadium","theater","library","factory","bedroom","kitchen",
+      "bathroom","corridor","ceiling","curtain","blanket","pillow","picture","drawing","painting","sculptor",
+      "teacher","student","scholar","science","history","geology","biology","physics","chemics","formula",
+      "unicorn","dragon","phoenix","monster","vampire","zombie","witches","wizards","spirits","demons",
+      "freedom","justice","liberty","equality","honesty","bravery","respect","wisdoms","victory","failure",
+      "morning","evening","midnight","sunrise","sunsets","rainbow","cyclone","typhoon","tornado","weather",
+      "journey","travels","voyager","explore","adventr","captain","sailors","pirates","brigade","armored",
+      "general","officer","soldier","sergean","private","marshal","command","fighter","bomber","missile",
+      "compute","printer","monitor","scanner","webpage","browser","program","network","serverr","systema",
+      "counsel","debates","meeting","voting","elected","parties","senator","cabinet","kingdom","republic",
+      "teacher","reading","writing","drawing","painting","musical","singing","dancing","actingg","gamingg",
+      "harvest","orchard","pasture","planted","fishing","hunting","minings","digging","farming","cooking",
+      "healthy","hungry","thirsty","angrily","calming","joyfull","smiling","cryings","laughin","talking"
+    ]
+  };
 
-    function focusKeyboard() {
-      kb.value = '';
-      kb.focus({ preventScroll:true });
-      // small keep-alive refocus to resist focus steals
-      setTimeout(() => {
-        if (document.activeElement !== kb) kb.focus({ preventScroll:true });
-      }, 50);
+  // ====== DOM hooks
+  const canvas = document.getElementById('c');
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const waveEl  = document.getElementById('wave');
+  const wpmEl   = document.getElementById('wpm');
+  const tierEl  = document.getElementById('tier');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovSubtitle = document.getElementById('ovSubtitle');
+  const startBtn = document.getElementById('startBtn');
+  const howBtn = document.getElementById('howBtn');
+  const typedBox = document.getElementById('typedText');
+  const btnPause = document.getElementById('btnPause');
+  const btnRestart = document.getElementById('btnRestart');
+  const toast = document.getElementById('toast');
+
+  // ====== Canvas setup
+  const ctx = canvas.getContext('2d');
+  function fit() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', fit);
+
+  // ====== Game state
+  let running = false, paused = false;
+  let score = 0, lives = 3, wave = 1;
+  let currentTier = 1;
+  const TIER_THRESH = [0, 700, 1700, 3200, 5200]; // score needed to *reach* tiers 1..5
+  let spawnTimer = 0, spawnInterval = 1400; // ms
+  let last = 0;
+  let typed = '';
+  let enemies = [];
+  let typedChars = 0;
+  let startTime = 0;
+
+  // ====== Tier helpers
+  function tierForScore(s) {
+    if (s >= TIER_THRESH[4]) return 5;
+    if (s >= TIER_THRESH[3]) return 4;
+    if (s >= TIER_THRESH[2]) return 3;
+    if (s >= TIER_THRESH[1]) return 2;
+    return 1;
+  }
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.remove('show'); // restart animation
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1900);
+  }
+
+  // ====== Word spawn
+  function randWord() {
+    const list = DICT[currentTier] || DICT[1];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  function spawnEnemy() {
+    const word = randWord();
+    const speed = 40 + Math.random()*30 + wave*4; // px/sec (wave still controls speed)
+    const x = 40 + Math.random() * (canvas.clientWidth - 80);
+    enemies.push({
+      word, x, y: -20, speed,
+      wobble: Math.random()*Math.PI*2,
+      hit:false
+    });
+  }
+
+  // ====== Lifecycle
+  function resetGame() {
+    score = 0; lives = 3; wave = 1;
+    currentTier = 1;
+    spawnInterval = 1400;
+    enemies = [];
+    typed = '';
+    typedChars = 0;
+    startTime = performance.now();
+    scoreEl.textContent = score;
+    livesEl.textContent = lives;
+    waveEl.textContent  = wave;
+    tierEl.textContent  = currentTier;
+    wpmEl.textContent   = 0;
+  }
+  function startGame() {
+    resetGame();
+    running = true; paused = false;
+    overlay.classList.remove('show');
+    last = performance.now();
+    requestAnimationFrame(loop);
+  }
+  function pauseToggle() {
+    if (!running) return;
+    paused = !paused;
+    overlay.classList.toggle('show', paused);
+    ovTitle.textContent = paused ? 'Paused' : 'Typing Wizard';
+    ovSubtitle.textContent = paused ? 'Take a breath. Press Start to resume.' : 'Defeat drifting words by typing them.';
+  }
+  function gameOver() {
+    running = false;
+    overlay.classList.add('show');
+    ovTitle.textContent = 'Game Over';
+    ovSubtitle.innerHTML = `Final score: <b>${score}</b> • Tier <b>${currentTier}</b> • Wave <b>${wave}</b>`;
+    startBtn.textContent = 'Play again';
+  }
+
+  // ====== Input (letters only)
+  window.addEventListener('keydown', (e) => {
+    if (!running || paused) return;
+
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      typed = '';
+      typedBox.textContent = typed;
+      return;
     }
+    if (e.key.length === 1) {
+      const ch = e.key.toLowerCase();
+      if (!/^[a-z]$/.test(ch)) return;
+      typed += ch;
+      typedChars++;
+      typedBox.textContent = typed;
 
-    // Forward keys from hidden input to the game (which listens on window keydown)
-    kb.addEventListener('input', () => {
-      const val = kb.value;
-      if (!val) return;
-      const ch = val.slice(-1);
-      kb.value = '';
-      if (!/^[a-zA-Z]$/.test(ch)) return;
-      frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
-    });
+      let bestIdx = -1, bestLen = 0;
+      for (let i=0;i<enemies.length;i++){
+        const w = enemies[i].word;
+        if (w.startsWith(typed)) {
+          if (typed.length > bestLen) { bestLen = typed.length; bestIdx = i; }
+          if (typed === w) {
+            enemies.splice(i,1);
+            // scoring: length + tier bonus + wave spice, min 10
+            const tierBonus = currentTier * 2;
+            const add = Math.max(10, 2*w.length + tierBonus + Math.floor(wave/2));
+            score += add;
+            scoreEl.textContent = score;
+            typed = '';
+            typedBox.textContent = typed;
 
-    kb.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace') {
-        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { key:'Backspace', bubbles:true }));
-        e.preventDefault();
+            // Wave pacing (kept simple)
+            if (score % 80 < 20) {
+              wave++;
+              waveEl.textContent = wave;
+              spawnInterval = Math.max(500, spawnInterval - 60);
+            }
+
+            // Tier check
+            const newTier = tierForScore(score);
+            if (newTier !== currentTier) {
+              currentTier = newTier;
+              tierEl.textContent = currentTier;
+              showToast(`Tier Up! Now Tier ${currentTier}`);
+              typed = '';
+              typedBox.textContent = typed;
+            }
+            return;
+          }
+        }
       }
-    });
+      // If typed sequence matches no prefix, clear
+      if (bestIdx === -1) {
+        typed = '';
+        typedBox.textContent = typed;
+      }
+    }
+  });
 
-    // Keep keyboard open during taps
-    window.addEventListener('touchend', () => {
-      if (document.activeElement !== kb) kb.focus({ preventScroll:true });
-    });
+  // ====== Loop
+  function loop(ts) {
+    if (!running) return;
+    const dt = (ts - last) / 1000;
+    last = ts;
 
-    // Mobile Start button: open keyboard + start the game in iframe
-    mobileStartBtn.addEventListener('click', () => {
-      focusKeyboard();
-      frame.contentWindow.postMessage({ type:'TW_START_GAME' }, '*');
+    if (!paused) {
+      update(dt);
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    // Spawn cadence
+    spawnTimer += dt*1000;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnEnemy();
+    }
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    for (let i=enemies.length-1;i>=0;i--){
+      const e = enemies[i];
+      e.y += e.speed * dt;
+      e.wobble += dt*2;
+      e.x += Math.sin(e.wobble)*10*dt;
+      if (e.y > h - 24) {
+        enemies.splice(i,1);
+        lives--;
+        livesEl.textContent = lives;
+        typed = '';
+        typedBox.textContent = typed;
+        if (lives <= 0) gameOver();
+      }
+    }
+    // WPM (rough)
+    const mins = (performance.now() - startTime)/60000;
+    const wpm = mins > 0 ? Math.round((typedChars/5)/mins) : 0;
+    wpmEl.textContent = wpm;
+  }
+
+  function draw() {
+    fit();
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.clearRect(0,0,w,h);
+
+    // subtle grid
+    ctx.globalAlpha = 0.06;
+    ctx.strokeStyle = '#7ea1ff';
+    ctx.lineWidth = 1;
+    const grid = 40;
+    for (let x=0;x<w;x+=grid){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for (let y=0;y<h;y+=grid){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+
+    // enemies
+    enemies.forEach(e => {
+      const padding = 8;
+      ctx.font = "16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      const textW = ctx.measureText(e.word).width;
+      const boxW = textW + padding*2, boxH = 30;
+      const x = e.x - boxW/2, y = e.y;
+
+      roundRect(ctx, x, y, boxW, boxH, 10);
+      ctx.fillStyle = 'rgba(22, 24, 42, 0.95)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(126,161,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const prefixLen = commonPrefixLen(typed, e.word);
+      const txtX = x + padding, txtY = y + 20;
+      const word = e.word;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(txtX, y, ctx.measureText(word.slice(0,prefixLen)).width, boxH);
+      ctx.clip();
+      ctx.fillStyle = '#5cf29b';
+      ctx.fillText(word, txtX, txtY);
+      ctx.restore();
+
+      ctx.fillStyle = '#f2f4ff';
+      ctx.fillText(word, txtX, txtY);
     });
-  </script>
+  }
+
+  function commonPrefixLen(a,b) {
+    let n = Math.min(a.length,b.length), i=0;
+    while (i<n && a[i]===b[i]) i++;
+    return i;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  // ====== Buttons
+  const typedText = document.getElementById('typedText');
+  const typedBoxRef = typedText; // ensure variable used above refers to this element
+
+  const startBtnEl = document.getElementById('startBtn');
+  const howBtnEl = document.getElementById('howBtn');
+
+  startBtnEl.addEventListener('click', () => {
+    startGame();
+  });
+
+  howBtnEl.addEventListener('click', () => {
+    ovTitle.textContent = 'How to play';
+    ovSubtitle.innerHTML = `
+      • Words drift down.<br/>
+      • <b>Type</b> a word exactly to destroy it.<br/>
+      • Tier increases based on <b>score</b>:
+      700 → Tier 2, 1700 → Tier 3, 3200 → Tier 4, 5200 → Tier 5.<br/>
+      • Longer words = more points. Missed words cost a life.
+    `;
+  });
+
+  btnPause.addEventListener('click', () => {
+    if (!running) {
+      ovTitle.textContent = 'Paused';
+      ovSubtitle.textContent = 'Press Start to begin.';
+      overlay.classList.add('show');
+      return;
+    }
+    pauseToggle();
+  });
+
+  btnRestart.addEventListener('click', () => {
+    startGame();
+  });
+
+  fit();
+})();
+</script>
 </body>
 </html>
