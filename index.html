@@ -59,7 +59,23 @@
     }
     #toast.show { display:block; animation: fade 1.8s ease-out forwards; }
     @keyframes fade { 0%{opacity:1; transform:translateY(0)} 90%{opacity:1} 100%{opacity:0; transform:translateY(-8px)} }
+
+    /* Leaderboard overlay (simple) */
+    #lbOverlay {
+      display:none; position:absolute; inset:0; background:rgba(10,11,18,0.75);
+      backdrop-filter:blur(3px); align-items:center; justify-content:center; z-index:50;
+    }
+    #lbCard {
+      background:#16182a; border:1px solid #22253e; border-radius:14px; padding:16px;
+      width:min(680px, 92%); max-height:70vh; overflow:auto;
+    }
+    #lbCard table { width:100%; border-collapse:collapse; font-size:14px; }
+    #lbCard th, #lbCard td { padding:6px 8px; text-align:left; }
+    #lbCard thead th { color:#8b90a3; font-weight:600; }
+    #lbClose { margin-left:auto; }
   </style>
+  <!-- Supabase client (step 5) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="wrap">
@@ -68,6 +84,8 @@
       <div class="ctrls">
         <button id="btnPause" class="small">Pause</button>
         <button id="btnRestart" class="small">Restart</button>
+        <!-- (step 6) New Leaderboard button -->
+        <button id="btnLeaderboard" class="small">Leaderboard</button>
       </div>
       <h1>🧙‍♂️ Typing Wizard</h1>
     </div>
@@ -85,6 +103,7 @@
     <div id="hint">Click Pause/Restart (top-left). Type letters to play. Backspace clears.</div>
     <div id="toast"></div>
 
+    <!-- Start/Paused overlay -->
     <div id="overlay" class="show">
       <div class="card">
         <h2 id="ovTitle">Typing Wizard</h2>
@@ -95,11 +114,34 @@
         </div>
       </div>
     </div>
+
+    <!-- (step 7) Leaderboard modal -->
+    <div id="lbOverlay">
+      <div id="lbCard">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <h3 style="margin:0; color:#7ea1ff;">🏆 Leaderboard</h3>
+          <button id="lbClose" class="small">Close</button>
+        </div>
+        <table id="lbTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Score</th><th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="lbBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 (() => {
+  // (step 4/5) === Supabase init ===
+  const SUPABASE_URL  = "https://ekxebxszxqmdxoebrlkq.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVreGVieHN6eHFtZHhvZWJybGtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1NzE2NjIsImV4cCI6MjA3MjE0NzY2Mn0.bBK5c3T6ljVnwi5TYT1n3aluxx2TIDE_uRl5HX7CGlQ";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
   // =======================
   // DICTIONARY (500 words)
   // =======================
@@ -176,9 +218,10 @@
   const ovSubtitle = document.getElementById('ovSubtitle');
   const startBtn = document.getElementById('startBtn');
   const howBtn = document.getElementById('howBtn');
-  const typedBox = document.getElementById('typedText');
+  const typedTextEl = document.getElementById('typedText');
   const btnPause = document.getElementById('btnPause');
   const btnRestart = document.getElementById('btnRestart');
+  const btnLeaderboard = document.getElementById('btnLeaderboard');
   const toast = document.getElementById('toast');
 
   // ====== Canvas setup
@@ -227,7 +270,7 @@
   }
   function spawnEnemy() {
     const word = randWord();
-    const speed = 40 + Math.random()*30 + wave*4; // px/sec (wave still controls speed)
+    const speed = 40 + Math.random()*30 + wave*4; // px/sec
     const x = 40 + Math.random() * (canvas.clientWidth - 80);
     enemies.push({
       word, x, y: -20, speed,
@@ -250,6 +293,7 @@
     waveEl.textContent  = wave;
     tierEl.textContent  = currentTier;
     wpmEl.textContent   = 0;
+    typedTextEl.textContent = '';
   }
   function startGame() {
     resetGame();
@@ -271,6 +315,15 @@
     ovTitle.textContent = 'Game Over';
     ovSubtitle.innerHTML = `Final score: <b>${score}</b> • Tier <b>${currentTier}</b> • Wave <b>${wave}</b>`;
     startBtn.textContent = 'Play again';
+
+    // (step 9) NEW: prompt for name (once) and submit score
+    let name = localStorage.getItem('twName') || '';
+    if (!name) {
+      name = prompt('Enter your name for the leaderboard (max 24 chars):') || '';
+      name = name.trim().slice(0, 24);
+      if (name) localStorage.setItem('twName', name);
+    }
+    if (name) submitScoreToLB(name, score);
   }
 
   // ====== Input (letters only)
@@ -280,7 +333,7 @@
     if (e.key === 'Backspace') {
       e.preventDefault();
       typed = '';
-      typedBox.textContent = typed;
+      typedTextEl.textContent = typed;
       return;
     }
     if (e.key.length === 1) {
@@ -288,7 +341,7 @@
       if (!/^[a-z]$/.test(ch)) return;
       typed += ch;
       typedChars++;
-      typedBox.textContent = typed;
+      typedTextEl.textContent = typed;
 
       let bestIdx = -1, bestLen = 0;
       for (let i=0;i<enemies.length;i++){
@@ -303,9 +356,9 @@
             score += add;
             scoreEl.textContent = score;
             typed = '';
-            typedBox.textContent = typed;
+            typedTextEl.textContent = typed;
 
-            // Wave pacing (kept simple)
+            // Wave pacing
             if (score % 80 < 20) {
               wave++;
               waveEl.textContent = wave;
@@ -319,7 +372,7 @@
               tierEl.textContent = currentTier;
               showToast(`Tier Up! Now Tier ${currentTier}`);
               typed = '';
-              typedBox.textContent = typed;
+              typedTextEl.textContent = typed;
             }
             return;
           }
@@ -328,7 +381,7 @@
       // If typed sequence matches no prefix, clear
       if (bestIdx === -1) {
         typed = '';
-        typedBox.textContent = typed;
+        typedTextEl.textContent = typed;
       }
     }
   });
@@ -364,7 +417,7 @@
         lives--;
         livesEl.textContent = lives;
         typed = '';
-        typedBox.textContent = typed;
+        typedTextEl.textContent = typed;
         if (lives <= 0) gameOver();
       }
     }
@@ -437,18 +490,59 @@
     ctx.closePath();
   }
 
+  // ====== (step 8) Leaderboard helpers
+  async function submitScoreToLB(name, score) {
+    try {
+      if (!name || !name.trim()) return;
+      name = name.trim().slice(0, 24);
+      const { error } = await supabase.from('leaderboard').insert([{ name, score }]);
+      if (error) console.error('Insert error:', error);
+    } catch (e) { console.error(e); }
+  }
+
+  async function fetchLeaderboard(limit = 50) {
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard')
+        .select('name, score, created_at')
+        .order('score', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(limit);
+      if (error) { console.error('Select error:', error); return []; }
+      return data || [];
+    } catch (e) { console.error(e); return []; }
+  }
+
+  function formatDate(d) {
+    try { return new Date(d).toLocaleString(); } catch { return d; }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  async function openLeaderboard() {
+    const list = await fetchLeaderboard(50);
+    const tbody = document.getElementById('lbBody');
+    tbody.innerHTML = '';
+    list.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:#8b90a3;">${i+1}</td>
+        <td>${escapeHtml(row.name)}</td>
+        <td style="font-weight:700;">${row.score}</td>
+        <td style="color:#8b90a3;">${formatDate(row.created_at)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('lbOverlay').style.display = 'flex';
+  }
+  function closeLeaderboard() {
+    document.getElementById('lbOverlay').style.display = 'none';
+  }
+
   // ====== Buttons
-  const typedText = document.getElementById('typedText');
-  const typedBoxRef = typedText; // ensure variable used above refers to this element
-
-  const startBtnEl = document.getElementById('startBtn');
-  const howBtnEl = document.getElementById('howBtn');
-
-  startBtnEl.addEventListener('click', () => {
-    startGame();
-  });
-
-  howBtnEl.addEventListener('click', () => {
+  startBtn.addEventListener('click', () => startGame());
+  howBtn.addEventListener('click', () => {
     ovTitle.textContent = 'How to play';
     ovSubtitle.innerHTML = `
       • Words drift down.<br/>
@@ -458,7 +552,6 @@
       • Longer words = more points. Missed words cost a life.
     `;
   });
-
   btnPause.addEventListener('click', () => {
     if (!running) {
       ovTitle.textContent = 'Paused';
@@ -468,9 +561,13 @@
     }
     pauseToggle();
   });
+  btnRestart.addEventListener('click', () => startGame());
 
-  btnRestart.addEventListener('click', () => {
-    startGame();
+  // (step 8) Wire leaderboard UI
+  btnLeaderboard.addEventListener('click', openLeaderboard);
+  document.getElementById('lbClose').addEventListener('click', closeLeaderboard);
+  document.getElementById('lbOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'lbOverlay') closeLeaderboard();
   });
 
   fit();
